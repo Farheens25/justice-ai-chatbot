@@ -1,4 +1,3 @@
-farheen-chatbot
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import sys
@@ -11,8 +10,6 @@ from routes.chat import router as chat_router
 from schemas.complaint import ComplaintCreate
 from services.supabase_client import supabase
 from pydantic import BaseModel
- main
-
 from services.chatbot_service import ChatbotService
 from models.schemas import ComplaintRequest, ChatbotResponse, HealthResponse, ChatRequest, ChatResponse
 
@@ -30,8 +27,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
- farheen-chatbot
 
 @app.get("/", response_model=HealthResponse)
 def home():
@@ -117,7 +112,7 @@ def gpt_chat(request: ChatRequest):
         return ChatResponse(**result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Chat failure: {str(e)}")
-=======
+
 # Include chat router
 app.include_router(chat_router)
 
@@ -238,5 +233,4 @@ def get_my_complaints(authorization: str = Header(None)):
         .eq("user_id", user.id) \
         .execute()
 
-    return response.data    
- main
+    return response.data
