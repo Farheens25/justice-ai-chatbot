@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Justice AI - Legal Guidance Chatbot</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 700px;
+            width: 100%;
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 0.95em;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 120px;
+            transition: border-color 0.3s;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+        }
+        
+        button {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-submit {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-submit:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn-clear {
+            background: #f0f0f0;
+            color: #333;
+        }
+        
+        .btn-clear:hover {
+            background: #e0e0e0;
+        }
+        
+        .result {
+            display: none;
+            margin-top: 30px;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .result.show {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .result.error {
+            border-left-color: #e74c3c;
+            background: #fadbd8;
+        }
+        
+        .result-section {
+            margin-bottom: 15px;
+        }
+        
+        .result-label {
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .result-content {
+            color: #333;
+            line-height: 1.6;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            color: #667eea;
+            margin-top: 20px;
+        }
+        
+        .loading.show {
+            display: block;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error-message {
+            background: #e74c3c;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .error-message.show {
+            display: block;
+        }
+        
+        .category-badge {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+        
+        .helpline-box {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 12px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        
+        .helpline-box strong {
+            color: #e67e22;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚖️ Justice AI</h1>
+            <p>AI-Powered Legal Guidance for Indian Justice System</p>
+        </div>
+        
+        <div class="content">
+            <div class="error-message" id="errorMessage"></div>
+            
+            <form id="complaintForm">
+                <div class="form-group">
+                    <label>Mode</label>
+                    <div style="margin-bottom:10px;">
+                        <label><input type="radio" name="mode" value="legal" checked> Legal Guidance</label>
+                        <label style="margin-left:20px;"><input type="radio" name="mode" value="chat"> General Chat</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="complaint">Describe Your Legal Issue / Ask a Question</label>
+                    <textarea 
+                        id="complaint" 
+                        name="complaint" 
+                        placeholder="Example: I was scammed online through a fake e-commerce website..."
+                        required
+                    ></textarea>
+                </div>
+                
+                <div class="button-group">
+                    <button type="submit" class="btn-submit" id="submitBtn">Get Legal Guidance</button>
+                    <button type="reset" class="btn-clear">Clear</button>
+                </div>
+            </form>
+            
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Processing your request...</p>
+            </div>
+            
+            <div class="conversation" id="conversation" style="display:none; margin-top:20px; max-height:300px; overflow-y:auto; background:#f1f1f1; padding:10px; border-radius:8px;">
+                <!-- chat messages will appear here -->
+            </div>
+
+            <div class="result" id="result">
+                <div class="result-section">
+                    <div class="result-label">Category</div>
+                    <div class="result-content">
+                        <span class="category-badge" id="categoryBadge"></span>
+                    </div>
+                </div>
+                
+                <div class="result-section">
+                    <div class="result-label">Applicable Legal Section</div>
+                    <div class="result-content" id="section"></div>
+                </div>
+                
+                <div class="result-section">
+                    <div class="result-label">Legal Advice</div>
+                    <div class="result-content" id="advice"></div>
+                </div>
+                
+                <div class="result-section">
+                    <div class="result-label">Escalation Path</div>
+                    <div class="result-content" id="escalation"></div>
+                </div>
+                
+                <div class="result-section">
+                    <div class="result-label">📞 Emergency Helpline</div>
+                    <div class="helpline-box">
+                        <strong id="helpline"></strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const API_BASE_URL = 'http://localhost:3000';
+        const form = document.getElementById('complaintForm');
+        const complaintInput = document.getElementById('complaint');
+        const submitBtn = document.getElementById('submitBtn');
+        const loading = document.getElementById('loading');
+        const result = document.getElementById('result');
+        const errorMessage = document.getElementById('errorMessage');
+        
+        // conversation state for GPT chat
+        let messages = [
+            {role: 'system', content: 'You are a helpful legal assistant.'}
+        ];
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const complaint = complaintInput.value.trim();
+            const mode = document.querySelector('input[name="mode"]:checked').value;
+            if (!complaint) {
+                showError('Please describe your issue or ask a question');
+                return;
+            }
+            
+            submitBtn.disabled = true;
+            loading.classList.add('show');
+            result.classList.remove('show');
+            errorMessage.classList.remove('show');
+
+            try {
+                let data;
+                if (mode === 'legal') {
+                    const response = await fetch(`${API_BASE_URL}/api/v1/chatbot/process`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ complaint: complaint })
+                    });
+                    if (!response.ok) throw new Error('Failed to process complaint');
+                    data = await response.json();
+                    if (data.success && data.response) {
+                        displayResult(data);
+                    } else {
+                        showError(data.error || 'Failed to process your complaint');
+                    }
+                } else {
+                    // chat mode
+                    messages.push({role: 'user', content: complaint});
+                    const response = await fetch(`${API_BASE_URL}/api/v1/chatbot/chat`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ messages: messages })
+                    });
+                    if (!response.ok) throw new Error('Chat request failed');
+                    data = await response.json();
+                    if (data.success && data.reply) {
+                        messages.push({role: 'assistant', content: data.reply});
+                        displayConversation();
+                    } else {
+                        showError(data.error || 'Chat error');
+                    }
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showError('Unable to connect to server. Please ensure the backend is running on ' + API_BASE_URL);
+            } finally {
+                submitBtn.disabled = false;
+                loading.classList.remove('show');
+            }
+        });
+        
+        function displayResult(data) {
+            document.getElementById('categoryBadge').textContent = data.category;
+            document.getElementById('section').textContent = data.response.section;
+            document.getElementById('advice').textContent = data.response.advice;
+            document.getElementById('escalation').textContent = data.response.escalation;
+            document.getElementById('helpline').textContent = data.response.helpline;
+            
+            result.classList.add('show');
+        }
+        
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.classList.add('show');
+        }
+        
+        function displayConversation() {
+            const convoDiv = document.getElementById('conversation');
+            convoDiv.innerHTML = '';
+            messages.forEach(msg => {
+                const p = document.createElement('p');
+                p.textContent = (msg.role === 'user' ? 'You: ' : 'Bot: ') + msg.content;
+                p.style.margin = '5px 0';
+                convoDiv.appendChild(p);
+            });
+            convoDiv.style.display = 'block';
+            convoDiv.scrollTop = convoDiv.scrollHeight;
+        }
+    </script>
+</body>
+</html>
