@@ -1,16 +1,14 @@
-# Node.js
-node_modules/
-dist/
-.env
-
 # Python
+venv/
 __pycache__/
 *.pyc
-venv/
 
-# VSCode
-.vscode/
+# Environment
+.env
 
-# OS files
+# Node
+node_modules/
+
+# OS
 .DS_Store
 Thumbs.db
