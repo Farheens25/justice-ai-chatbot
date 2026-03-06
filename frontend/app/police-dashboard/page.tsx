@@ -22,6 +22,9 @@ interface PoliceCase {
   complainant_name: string | null
   complainant_phone: string | null
   complainant_location: string | null
+  is_protected_case?: boolean | null
+  protected_reference_id?: string | null
+  nearest_police_station?: string | null
 }
 
 export default function PoliceDashboard() {
@@ -151,6 +154,13 @@ export default function PoliceDashboard() {
     }
   }
 
+  const applyQuickProgress = (value: number) => {
+    setProgressPercent(value)
+    if (value >= 100) {
+      setProgressNotes((prev) => prev || 'Investigation completed. Case marked resolved.')
+    }
+  }
+
   if (!isAuthChecked) {
     return null
   }
@@ -257,6 +267,9 @@ export default function PoliceDashboard() {
                           <AlertCircle className="w-5 h-5 text-orange-600" />
                         )}
                         <h3 className="text-lg font-semibold text-gray-900">{caseItem.title}</h3>
+                        {caseItem.is_protected_case && (
+                          <span className="px-2 py-1 rounded bg-amber-100 text-amber-800 text-xs font-semibold">Protected</span>
+                        )}
                       </div>
                       <p className="text-sm text-gray-600 mb-2">{caseItem.description || 'No description'}</p>
                       <div className="flex flex-wrap gap-4 text-sm text-gray-500">
@@ -264,6 +277,7 @@ export default function PoliceDashboard() {
                         <span>Tracking: {caseItem.tracking_id || 'N/A'}</span>
                         <span>Type: {caseItem.case_type || 'N/A'}</span>
                         <span>Progress: {caseItem.progress_percent || 0}%</span>
+                        {caseItem.nearest_police_station && <span>Station: {caseItem.nearest_police_station}</span>}
                       </div>
                     </div>
                     <Eye className="w-5 h-5 text-gray-400 flex-shrink-0 mt-1" />
@@ -303,6 +317,14 @@ export default function PoliceDashboard() {
                   <p className="text-sm text-gray-500">Contact</p>
                   <p className="text-gray-900">{selectedCase.complainant_phone || 'N/A'}</p>
                 </div>
+                <div>
+                  <p className="text-sm text-gray-500">Protected ID</p>
+                  <p className="text-gray-900">{selectedCase.protected_reference_id || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Nearest Station</p>
+                  <p className="text-gray-900">{selectedCase.nearest_police_station || 'N/A'}</p>
+                </div>
               </div>
 
               <div>
@@ -312,6 +334,12 @@ export default function PoliceDashboard() {
 
               <div className="border-t pt-4">
                 <h3 className="font-semibold text-gray-900 mb-3">File FIR / Update Progress</h3>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  <button type="button" onClick={() => applyQuickProgress(25)} className="px-3 py-1.5 rounded bg-blue-100 text-blue-800 text-xs font-semibold">25%</button>
+                  <button type="button" onClick={() => applyQuickProgress(50)} className="px-3 py-1.5 rounded bg-yellow-100 text-yellow-800 text-xs font-semibold">50%</button>
+                  <button type="button" onClick={() => applyQuickProgress(75)} className="px-3 py-1.5 rounded bg-orange-100 text-orange-800 text-xs font-semibold">75%</button>
+                  <button type="button" onClick={() => applyQuickProgress(100)} className="px-3 py-1.5 rounded bg-green-100 text-green-800 text-xs font-semibold">Mark Completed</button>
+                </div>
                 <div className="space-y-3">
                   <div>
                     <label className="block text-sm text-gray-600 mb-1">FIR Number</label>
@@ -350,6 +378,15 @@ export default function PoliceDashboard() {
               <div className="flex gap-3 pt-2">
                 <button onClick={handleUpdateCase} disabled={isUpdating} className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-semibold transition">
                   {isUpdating ? 'Saving...' : 'Save FIR/Progress'}
+                </button>
+                <button
+                  onClick={() => {
+                    setProgressPercent(100)
+                    setProgressNotes((prev) => prev || 'Investigation completed. Case marked resolved.')
+                  }}
+                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition"
+                >
+                  Complete
                 </button>
                 <button onClick={() => setSelectedCase(null)} className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-900 px-4 py-2 rounded-lg font-semibold transition">
                   Close

@@ -162,14 +162,31 @@ export default function Home() {
     description: '',
     evidence: '',
     location: '',
+    incidentDate: '',
+    incidentTime: '',
+    accusedName: '',
+    witnessDetails: '',
+    urgencyLevel: 'medium',
+    preferredLanguage: 'english',
+    pincode: '',
+    isProtectedCase: false,
   })
   const [uploadedImages, setUploadedImages] = useState<File[]>([])
   const [aiAnalysisInput, setAiAnalysisInput] = useState('')
   const [aiAnalysisResult, setAiAnalysisResult] = useState<any>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [chatbotMode, setChatbotMode] = useState<'legal' | 'chat'>('legal')
+  const [chatbotMessages, setChatbotMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([])
   const [isSubmittingComplaint, setIsSubmittingComplaint] = useState(false)
   const [submittedTrackingId, setSubmittedTrackingId] = useState('')
   const [submittedCaseStrength, setSubmittedCaseStrength] = useState<number | null>(null)
+  const [submittedSummary, setSubmittedSummary] = useState('')
+  const [submittedCaseAnalysis, setSubmittedCaseAnalysis] = useState<any>(null)
+  const [submittedEscalationDraft, setSubmittedEscalationDraft] = useState('')
+  const [submittedProtectedId, setSubmittedProtectedId] = useState('')
+  const [submittedNearestPoliceStation, setSubmittedNearestPoliceStation] = useState('')
+  const [nearestPoliceStation, setNearestPoliceStation] = useState('')
+  const [submitSuccessMessage, setSubmitSuccessMessage] = useState('')
   const [trackingIdInput, setTrackingIdInput] = useState('')
   const [trackingResult, setTrackingResult] = useState<any>(null)
   const [isTrackingLoading, setIsTrackingLoading] = useState(false)
@@ -294,64 +311,53 @@ export default function Home() {
     'environmental': 'Environmental Violation'
   }
 
-  const aiCaseInfo: { [key: string]: string } = {
-    'harassment': 'This case involves unwanted behavior causing distress. You may be entitled to file an FIR, seek compensation, and get court orders for protection.',
-    'cybercrime': 'This involves illegal activities on digital platforms. Report to Cyber Crime cell, preserve evidence, and avoid further contact with accused.',
-    'theft': 'This involves unlawful taking of property. File an FIR with local police, provide witness information, and documentation of stolen items.',
-    'domestic': 'Domestic violence cases are serious. Contact women helpline 1091, file protection order, and preserve medical/photographic evidence.',
-    'corruption': 'Report to Anti-Corruption Bureau, provide documentary evidence, and maintain records of all transactions and communications.',
-    'fraud': 'Preserve all documents, bank statements, agreements. Report to police and consumer protection authority with complete transaction history.',
-    'assault': 'Seek immediate medical attention, get medical certificate, file FIR with police, and collect witness statements.',
-    'property': 'Gather all property documents, prepare timeline of dispute, consult property lawyer, and keep all communications as evidence.',
-    'labor': 'Document work conditions, wages, hours. Contact Labor Department, keep salary slips, and maintain communication records.',
-    'sexual': 'Seek support from counselor, report to police, preserve evidence, contact women helpline 1091.',
-    'child': 'Contact child protection services immediately. Report to police, preserve evidence, ensure child safety.',
-    'environmental': 'Document pollution/damage with photos, report to pollution control board, and gather witness statements.'
-  }
-
-  const handleAIAnalysis = () => {
+  const handleAIAnalysis = async () => {
     if (!aiAnalysisInput.trim()) {
       alert('Please describe your case')
       return
     }
 
     setIsAnalyzing(true)
-    setTimeout(() => {
-      // Simple AI logic - detect case type from keywords
-      const input = aiAnalysisInput.toLowerCase()
-      let detectedType = 'fraud'
-      
-      if (input.includes('harass')) detectedType = 'harassment'
-      else if (input.includes('cyber') || input.includes('online') || input.includes('hacking')) detectedType = 'cybercrime'
-      else if (input.includes('steal') || input.includes('theft') || input.includes('stolen')) detectedType = 'theft'
-      else if (input.includes('domestic') || input.includes('spouse') || input.includes('abuse')) detectedType = 'domestic'
-      else if (input.includes('corrupt') || input.includes('bribe')) detectedType = 'corruption'
-      else if (input.includes('fraud') || input.includes('scam') || input.includes('cheat')) detectedType = 'fraud'
-      else if (input.includes('assault') || input.includes('hit') || input.includes('beat')) detectedType = 'assault'
-      else if (input.includes('property') || input.includes('land') || input.includes('house')) detectedType = 'property'
-      else if (input.includes('labor') || input.includes('wage') || input.includes('salary') || input.includes('work')) detectedType = 'labor'
-      else if (input.includes('sexual') || input.includes('unwanted touch')) detectedType = 'sexual'
-      else if (input.includes('child') || input.includes('kid')) detectedType = 'child'
-      else if (input.includes('environment') || input.includes('pollution')) detectedType = 'environmental'
-
-      setAiAnalysisResult({
-        caseType: caseTypeMapping[detectedType],
-        caseId: detectedType,
-        description: aiCaseInfo[detectedType],
-        nextSteps: [
-          '1. Document all evidence (photos, videos, documents, messages)',
-          '2. Write detailed account with dates and times',
-          '3. Identify and list all witnesses',
-          '4. Contact relevant authorities immediately',
-          '5. Consult with a legal professional'
-        ],
-        relevantLaws: detectedType === 'harassment' ? ['IPC Section 503-506', 'Protection of Women from Sexual Harassment Act'] :
-                      detectedType === 'cybercrime' ? ['IPC Section 65-75', 'Information Technology Act 2000'] :
-                      detectedType === 'theft' ? ['IPC Section 378-382', 'Theft Act'] :
-                      ['Relevant Criminal Laws']
-      })
+    try {
+      if (chatbotMode === 'legal') {
+        const response = await fetch(`${API_BASE_URL}/chatbot/process`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ complaint: aiAnalysisInput }),
+        })
+        const data = await response.json()
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || 'Failed to process complaint')
+        }
+        setAiAnalysisResult({
+          mode: 'legal',
+          category: data.category,
+          section: data.response?.section,
+          advice: data.response?.advice,
+          escalation: data.response?.escalation,
+          helpline: data.response?.helpline,
+          disclaimer: data.disclaimer,
+        })
+      } else {
+        const nextMessages = [...chatbotMessages, { role: 'user' as const, content: aiAnalysisInput }]
+        const response = await fetch(`${API_BASE_URL}/chatbot/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages: nextMessages }),
+        })
+        const data = await response.json()
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || 'Chat request failed')
+        }
+        const updated = [...nextMessages, { role: 'assistant' as const, content: data.reply }]
+        setChatbotMessages(updated)
+      }
+      setAiAnalysisInput('')
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Chatbot request failed')
+    } finally {
       setIsAnalyzing(false)
-    }, 1500)
+    }
   }
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -363,6 +369,56 @@ export default function Home() {
 
   const removeImage = (index: number) => {
     setUploadedImages(uploadedImages.filter((_, i) => i !== index))
+  }
+
+  const saveComplaintDraft = () => {
+    const draft = {
+      selectedCategory,
+      formData,
+      savedAt: new Date().toISOString(),
+    }
+    localStorage.setItem('justiceai_complaint_draft', JSON.stringify(draft))
+    alert('Draft saved locally')
+  }
+
+  const loadComplaintDraft = () => {
+    const raw = localStorage.getItem('justiceai_complaint_draft')
+    if (!raw) {
+      alert('No saved draft found')
+      return
+    }
+    try {
+      const parsed = JSON.parse(raw)
+      setSelectedCategory(parsed.selectedCategory || null)
+      setFormData((prev) => ({ ...prev, ...(parsed.formData || {}) }))
+      alert('Draft loaded')
+    } catch {
+      alert('Draft is invalid')
+    }
+  }
+
+  const copyEscalationDraft = async (draft: string) => {
+    try {
+      await navigator.clipboard.writeText(draft)
+      alert('Escalation draft copied')
+    } catch {
+      alert('Unable to copy escalation draft')
+    }
+  }
+
+  const fetchNearestPoliceStation = async (pincode: string) => {
+    if (!/^\d{6}$/.test(pincode)) {
+      setNearestPoliceStation('')
+      return
+    }
+    try {
+      const response = await fetch(`${API_BASE_URL}/cases/public/police-station/${pincode}`)
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Unable to fetch nearest police station')
+      setNearestPoliceStation(data.nearestPoliceStation || '')
+    } catch {
+      setNearestPoliceStation('Nearest police station to be assigned')
+    }
   }
 
   const handleSubmitComplaint = async (e: React.FormEvent) => {
@@ -393,6 +449,14 @@ export default function Home() {
           description: formData.description,
           evidence: formData.evidence,
           proofCount: uploadedImages.length,
+          incidentDate: formData.incidentDate,
+          incidentTime: formData.incidentTime,
+          accusedName: formData.accusedName,
+          witnessDetails: formData.witnessDetails,
+          urgencyLevel: formData.urgencyLevel,
+          preferredLanguage: formData.preferredLanguage,
+          pincode: formData.pincode,
+          isProtectedCase: formData.isProtectedCase,
         }),
       })
 
@@ -403,9 +467,31 @@ export default function Home() {
 
       setSubmittedTrackingId(data.complaint?.trackingId || '')
       setSubmittedCaseStrength(data.complaint?.caseStrength ?? null)
-      setFormData({ name: '', email: '', phone: '', description: '', evidence: '', location: '' })
+      setSubmittedSummary(data.complaint?.complaintSummary || '')
+      setSubmittedCaseAnalysis(data.complaint?.caseAnalysis || null)
+      setSubmittedEscalationDraft(data.complaint?.escalationDraft || '')
+      setSubmittedProtectedId(data.complaint?.protectedId || '')
+      setSubmittedNearestPoliceStation(data.complaint?.nearestPoliceStation || '')
+      setSubmitSuccessMessage(data.message || 'Complaint filed successfully')
+      setFormData({
+        name: '',
+        email: '',
+        phone: '',
+        description: '',
+        evidence: '',
+        location: '',
+        incidentDate: '',
+        incidentTime: '',
+        accusedName: '',
+        witnessDetails: '',
+        urgencyLevel: 'medium',
+        preferredLanguage: 'english',
+        pincode: '',
+        isProtectedCase: false,
+      })
       setUploadedImages([])
       setSelectedCategory(null)
+      setNearestPoliceStation('')
       setIsFileComplaintOpen(false)
       alert(`Complaint filed. Your tracking ID is: ${data.complaint?.trackingId}`)
     } catch (err) {
@@ -454,9 +540,12 @@ export default function Home() {
               <button 
                 onClick={() => setIsFileComplaintOpen(true)}
                 className="text-gray-700 hover:text-blue-600 transition font-medium">File Case</button>
-              <button 
-                onClick={() => setIsAIAnalysisOpen(true)}
-                className="text-gray-700 hover:text-blue-600 transition font-medium">AI Analysis</button>
+              <Link
+                href="/ai-case-analysis"
+                className="text-gray-700 hover:text-blue-600 transition font-medium"
+              >
+                AI Analysis
+              </Link>
               <button
                 onClick={() => {
                   const el = document.getElementById('track-case-section')
@@ -490,12 +579,13 @@ export default function Home() {
                   setIsMenuOpen(false)
                 }}
                 className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 rounded transition">File Case</button>
-              <button 
-                onClick={() => {
-                  setIsAIAnalysisOpen(true)
-                  setIsMenuOpen(false)
-                }}
-                className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 rounded transition">AI Analysis</button>
+              <Link
+                href="/ai-case-analysis"
+                onClick={() => setIsMenuOpen(false)}
+                className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 rounded transition"
+              >
+                AI Analysis
+              </Link>
               <button
                 onClick={() => {
                   const el = document.getElementById('track-case-section')
@@ -530,13 +620,13 @@ export default function Home() {
                 <FileText className="w-5 h-5" />
                 File Complaint
               </button>
-              <button
-                onClick={() => setIsAIAnalysisOpen(true)}
+              <Link
+                href="/ai-case-analysis"
                 className="bg-blue-500 text-white px-8 py-3 rounded-lg font-bold hover:bg-blue-400 transition inline-flex items-center justify-center gap-2"
               >
                 <Brain className="w-5 h-5" />
                 AI Case Analysis
-              </button>
+              </Link>
             </div>
           </div>
 
@@ -550,6 +640,11 @@ export default function Home() {
           <div id="track-case-section" className="mt-12 bg-white text-gray-900 rounded-lg p-6 max-w-3xl mx-auto">
             <h3 className="text-2xl font-bold mb-3">Track Your Complaint</h3>
             <p className="text-sm text-gray-600 mb-4">Enter your tracking ID to view FIR and case progress.</p>
+            {submitSuccessMessage && (
+              <div className="mb-4 p-3 rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm font-medium">
+                {submitSuccessMessage}
+              </div>
+            )}
             <div className="flex flex-col sm:flex-row gap-3">
               <input
                 type="text"
@@ -574,6 +669,45 @@ export default function Home() {
                 {submittedCaseStrength !== null && (
                   <p className="text-sm text-green-700">Estimated case strength: {submittedCaseStrength}%</p>
                 )}
+                {submittedProtectedId && (
+                  <p className="text-sm text-green-700">Protected ID: {submittedProtectedId}</p>
+                )}
+                {submittedNearestPoliceStation && (
+                  <p className="text-sm text-green-700">Nearest Police Station: {submittedNearestPoliceStation}</p>
+                )}
+                {submittedSummary && (
+                  <p className="text-sm text-green-700 mt-1"><span className="font-medium">Abstract:</span> {submittedSummary}</p>
+                )}
+                {submittedCaseAnalysis && (
+                  <div className="mt-2 text-sm text-green-700">
+                    <p><span className="font-medium">Analysis:</span> {submittedCaseAnalysis.likelyOutcome}</p>
+                    <p>Completeness Score: {submittedCaseAnalysis.completenessScore}% | Risk: {submittedCaseAnalysis.riskLevel}</p>
+                  </div>
+                )}
+                {submittedEscalationDraft && (
+                  <div className="mt-3">
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      <button
+                        onClick={() => copyEscalationDraft(submittedEscalationDraft)}
+                        className="px-3 py-1.5 rounded bg-green-700 text-white text-xs font-semibold"
+                      >
+                        Copy Escalation Draft
+                      </button>
+                      <a
+                        href={`mailto:?subject=Case Escalation Request&body=${encodeURIComponent(submittedEscalationDraft)}`}
+                        className="px-3 py-1.5 rounded bg-blue-700 text-white text-xs font-semibold"
+                      >
+                        Send Draft by Email
+                      </a>
+                    </div>
+                    <textarea
+                      readOnly
+                      value={submittedEscalationDraft}
+                      rows={8}
+                      className="w-full px-3 py-2 border border-green-300 rounded-lg bg-white text-xs text-gray-700"
+                    />
+                  </div>
+                )}
               </div>
             )}
 
@@ -585,6 +719,28 @@ export default function Home() {
                 <p><span className="font-semibold">FIR:</span> {trackingResult.tracking.firNumber || 'Not filed yet'}</p>
                 <p><span className="font-semibold">Winning chance estimate:</span> {trackingResult.tracking.caseStrength}%</p>
                 <p><span className="font-semibold">Latest note:</span> {trackingResult.tracking.progressNotes || 'No notes yet'}</p>
+                {trackingResult.tracking.protectedId && (
+                  <p><span className="font-semibold">Protected ID:</span> {trackingResult.tracking.protectedId}</p>
+                )}
+                {trackingResult.tracking.nearestPoliceStation && (
+                  <p><span className="font-semibold">Nearest Station:</span> {trackingResult.tracking.nearestPoliceStation}</p>
+                )}
+                {trackingResult.tracking.complaintSummary && (
+                  <p><span className="font-semibold">Abstract:</span> {trackingResult.tracking.complaintSummary}</p>
+                )}
+                {trackingResult.tracking.caseAnalysis?.likelyOutcome && (
+                  <p><span className="font-semibold">Analysis:</span> {trackingResult.tracking.caseAnalysis.likelyOutcome}</p>
+                )}
+                {trackingResult.tracking.escalationDraft && (
+                  <div className="pt-2">
+                    <button
+                      onClick={() => copyEscalationDraft(trackingResult.tracking.escalationDraft)}
+                      className="px-3 py-1.5 rounded bg-blue-700 text-white text-xs font-semibold"
+                    >
+                      Copy Escalation Draft
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -673,6 +829,80 @@ export default function Home() {
 
                     <div className="grid md:grid-cols-2 gap-6">
                       <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Incident Date</label>
+                        <input
+                          type="date"
+                          value={formData.incidentDate}
+                          onChange={(e) => setFormData({ ...formData, incidentDate: e.target.value })}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Incident Time</label>
+                        <input
+                          type="time"
+                          value={formData.incidentTime}
+                          onChange={(e) => setFormData({ ...formData, incidentTime: e.target.value })}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Accused Name (if known)</label>
+                        <input
+                          type="text"
+                          value={formData.accusedName}
+                          onChange={(e) => setFormData({ ...formData, accusedName: e.target.value })}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition"
+                          placeholder="Name / identifier"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Urgency Level</label>
+                        <select
+                          value={formData.urgencyLevel}
+                          onChange={(e) => setFormData({ ...formData, urgencyLevel: e.target.value })}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition"
+                        >
+                          <option value="low">Low</option>
+                          <option value="medium">Medium</option>
+                          <option value="high">High</option>
+                          <option value="critical">Critical</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Preferred Language</label>
+                        <select
+                          value={formData.preferredLanguage}
+                          onChange={(e) => setFormData({ ...formData, preferredLanguage: e.target.value })}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition"
+                        >
+                          <option value="english">English</option>
+                          <option value="hindi">Hindi</option>
+                          <option value="marathi">Marathi</option>
+                          <option value="tamil">Tamil</option>
+                          <option value="telugu">Telugu</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Witness Details</label>
+                        <input
+                          type="text"
+                          value={formData.witnessDetails}
+                          onChange={(e) => setFormData({ ...formData, witnessDetails: e.target.value })}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition"
+                          placeholder="Witness names/contacts"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
                         <input
                           type="tel"
@@ -691,6 +921,52 @@ export default function Home() {
                           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition"
                           required
                         />
+                      </div>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Pincode</label>
+                        <input
+                          type="text"
+                          value={formData.pincode}
+                          onChange={(e) => {
+                            const nextValue = e.target.value.replace(/\D/g, '').slice(0, 6)
+                            setFormData({ ...formData, pincode: nextValue })
+                            if (nextValue.length === 6) {
+                              fetchNearestPoliceStation(nextValue)
+                            } else {
+                              setNearestPoliceStation('')
+                            }
+                          }}
+                          placeholder="6-digit pincode"
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Nearest Police Station</label>
+                        <div className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-700 min-h-[48px] flex items-center">
+                          {nearestPoliceStation || 'Enter pincode to auto-detect nearest station'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <p className="text-sm font-semibold text-amber-900">Protected Case Filing</p>
+                          <p className="text-xs text-amber-800">
+                            Enable this to hide complainant identity from police view. You will receive a Protected ID.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, isProtectedCase: !formData.isProtectedCase })}
+                          className={`px-4 py-2 rounded-lg text-xs font-bold ${formData.isProtectedCase ? 'bg-amber-700 text-white' : 'bg-white text-amber-800 border border-amber-300'}`}
+                        >
+                          {formData.isProtectedCase ? 'Protected ID ON' : 'Enable Protected ID'}
+                        </button>
                       </div>
                     </div>
 
@@ -760,6 +1036,20 @@ export default function Home() {
 
                     <div className="flex gap-3 pt-6 sticky bottom-0 bg-white">
                       <button
+                        type="button"
+                        onClick={saveComplaintDraft}
+                        className="bg-gray-100 text-gray-800 px-4 py-4 rounded-lg font-bold hover:bg-gray-200 transition"
+                      >
+                        Save Draft
+                      </button>
+                      <button
+                        type="button"
+                        onClick={loadComplaintDraft}
+                        className="bg-gray-100 text-gray-800 px-4 py-4 rounded-lg font-bold hover:bg-gray-200 transition"
+                      >
+                        Load Draft
+                      </button>
+                      <button
                         type="submit"
                         disabled={isSubmittingComplaint}
                         className="flex-1 bg-blue-600 disabled:bg-gray-400 text-white px-6 py-4 rounded-lg font-bold hover:bg-blue-700 transition flex items-center justify-center gap-2"
@@ -801,6 +1091,7 @@ export default function Home() {
                   setIsAIAnalysisOpen(false)
                   setAiAnalysisInput('')
                   setAiAnalysisResult(null)
+                  setChatbotMessages([])
                 }}
                 className="p-2 hover:bg-gray-100 rounded-lg transition"
               >
@@ -811,13 +1102,50 @@ export default function Home() {
             <div className="p-6">
               {!aiAnalysisResult ? (
                 <div className="space-y-4">
-                  <p className="text-gray-600">Describe your case and our AI will help identify the case type and provide guidance.</p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setChatbotMode('legal')
+                        setAiAnalysisResult(null)
+                      }}
+                      className={`px-4 py-2 rounded-lg text-sm font-semibold ${chatbotMode === 'legal' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'}`}
+                    >
+                      Legal Guidance
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setChatbotMode('chat')
+                        setAiAnalysisResult(null)
+                      }}
+                      className={`px-4 py-2 rounded-lg text-sm font-semibold ${chatbotMode === 'chat' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'}`}
+                    >
+                      General Chat
+                    </button>
+                  </div>
+                  <p className="text-gray-600">
+                    {chatbotMode === 'legal'
+                      ? 'Describe your legal issue to get category, legal sections, advice, escalation path, and helpline.'
+                      : 'Ask legal questions and continue conversation with Justice AI chatbot.'}
+                  </p>
+                  {chatbotMode === 'chat' && chatbotMessages.length > 0 && (
+                    <div className="max-h-56 overflow-y-auto bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-2">
+                      {chatbotMessages.map((msg, idx) => (
+                        <p key={idx} className="text-sm">
+                          <span className="font-semibold">{msg.role === 'user' ? 'You' : 'Bot'}:</span> {msg.content}
+                        </p>
+                      ))}
+                    </div>
+                  )}
                   <textarea
                     value={aiAnalysisInput}
                     onChange={(e) => setAiAnalysisInput(e.target.value)}
                     rows={8}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition"
-                    placeholder="Describe what happened, including details about people involved, dates, times, and any actions taken..."
+                    placeholder={chatbotMode === 'legal'
+                      ? 'Example: I was scammed online through a fake e-commerce website...'
+                      : 'Type your question for Justice AI chatbot...'}
                   />
                   <div className="flex gap-3">
                     <button
@@ -826,12 +1154,14 @@ export default function Home() {
                       className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-6 py-3 rounded-lg font-bold transition flex items-center justify-center gap-2"
                     >
                       <Brain className="w-5 h-5" />
-                      {isAnalyzing ? 'Analyzing...' : 'Analyze Case'}
+                      {isAnalyzing ? 'Processing...' : chatbotMode === 'legal' ? 'Get Legal Guidance' : 'Send'}
                     </button>
                     <button
                       onClick={() => {
                         setIsAIAnalysisOpen(false)
                         setAiAnalysisInput('')
+                        setAiAnalysisResult(null)
+                        setChatbotMessages([])
                       }}
                       className="flex-1 bg-gray-200 text-gray-900 px-6 py-3 rounded-lg font-bold hover:bg-gray-300 transition"
                     >
@@ -841,58 +1171,58 @@ export default function Home() {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                    <h3 className="text-2xl font-bold text-blue-900 mb-2">Case Type Identified:</h3>
-                    <p className="text-4xl font-bold text-blue-600">{aiAnalysisResult.caseType}</p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <h4 className="font-bold text-gray-900">Description:</h4>
-                    <p className="text-gray-700 leading-relaxed">{aiAnalysisResult.description}</p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <h4 className="font-bold text-gray-900">Next Steps:</h4>
-                    <ul className="space-y-2">
-                      {aiAnalysisResult.nextSteps.map((step: string, idx: number) => (
-                        <li key={idx} className="flex gap-3 text-gray-700">
-                          <span className="text-blue-600 font-bold">{idx + 1}.</span>
-                          <span>{step.replace(/^\d+\.\s*/, '')}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <div className="space-y-2">
-                    <h4 className="font-bold text-gray-900">Relevant Laws:</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {aiAnalysisResult.relevantLaws.map((law: string, idx: number) => (
-                        <span key={idx} className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-                          {law}
-                        </span>
+                  {aiAnalysisResult.mode === 'legal' ? (
+                    <>
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                        <h3 className="text-2xl font-bold text-blue-900 mb-2">Category:</h3>
+                        <p className="text-4xl font-bold text-blue-600">{aiAnalysisResult.category}</p>
+                      </div>
+                      <div className="space-y-2">
+                        <h4 className="font-bold text-gray-900">Applicable Legal Section</h4>
+                        <p className="text-gray-700 leading-relaxed">{aiAnalysisResult.section}</p>
+                      </div>
+                      <div className="space-y-2">
+                        <h4 className="font-bold text-gray-900">Legal Advice</h4>
+                        <p className="text-gray-700 leading-relaxed">{aiAnalysisResult.advice}</p>
+                      </div>
+                      <div className="space-y-2">
+                        <h4 className="font-bold text-gray-900">Escalation Path</h4>
+                        <p className="text-gray-700 leading-relaxed">{aiAnalysisResult.escalation}</p>
+                      </div>
+                      <div className="space-y-2">
+                        <h4 className="font-bold text-gray-900">Emergency Helpline</h4>
+                        <p className="text-gray-700 leading-relaxed">{aiAnalysisResult.helpline}</p>
+                      </div>
+                      {aiAnalysisResult.disclaimer && (
+                        <p className="text-xs text-gray-500">{aiAnalysisResult.disclaimer}</p>
+                      )}
+                    </>
+                  ) : (
+                    <div className="max-h-72 overflow-y-auto bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-2">
+                      {chatbotMessages.map((msg, idx) => (
+                        <p key={idx} className="text-sm">
+                          <span className="font-semibold">{msg.role === 'user' ? 'You' : 'Bot'}:</span> {msg.content}
+                        </p>
                       ))}
                     </div>
-                  </div>
+                  )}
 
                   <div className="flex gap-3 pt-4">
                     <button
                       onClick={() => {
-                        setIsFileComplaintOpen(true)
-                        setIsAIAnalysisOpen(false)
-                        setSelectedCategory(aiAnalysisResult.caseId)
-                        setAiAnalysisInput('')
                         setAiAnalysisResult(null)
                       }}
                       className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold transition flex items-center justify-center gap-2"
                     >
-                      <FileText className="w-5 h-5" />
-                      File Complaint Now
+                      <Brain className="w-5 h-5" />
+                      Ask Another
                     </button>
                     <button
                       onClick={() => {
                         setIsAIAnalysisOpen(false)
                         setAiAnalysisInput('')
                         setAiAnalysisResult(null)
+                        setChatbotMessages([])
                       }}
                       className="flex-1 bg-gray-200 text-gray-900 px-6 py-3 rounded-lg font-bold hover:bg-gray-300 transition"
                     >

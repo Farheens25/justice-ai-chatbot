@@ -4,6 +4,19 @@ import { authenticateToken, requireRoles } from '../middleware/auth.js';
 
 const router = express.Router();
 
+const PINCODE_STATION_MAP = {
+  '400001': 'Azad Maidan Police Station, Mumbai',
+  '400050': 'Bandra Police Station, Mumbai',
+  '400053': 'Andheri Police Station, Mumbai',
+  '110001': 'Connaught Place Police Station, New Delhi',
+  '110092': 'Preet Vihar Police Station, Delhi',
+  '560001': 'Cubbon Park Police Station, Bengaluru',
+  '560034': 'Koramangala Police Station, Bengaluru',
+  '500001': 'Abids Police Station, Hyderabad',
+  '600001': 'Flower Bazaar Police Station, Chennai',
+  '700001': 'Hare Street Police Station, Kolkata',
+};
+
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
 const calculateCaseStrength = ({ description = '', evidence = '', proofCount = 0 }) => {
@@ -11,6 +24,94 @@ const calculateCaseStrength = ({ description = '', evidence = '', proofCount = 0
   const evidenceScore = evidence.trim().length > 0 ? clamp(Math.floor(evidence.trim().length / 20), 0, 25) : 0;
   const proofScore = clamp(proofCount * 8, 0, 20);
   return clamp(descriptionScore + evidenceScore + proofScore, 5, 95);
+};
+
+const buildComplaintSummary = ({
+  caseType,
+  description = '',
+  location = '',
+  incidentDate = '',
+  incidentTime = '',
+  accusedName = '',
+}) => {
+  const shortDescription = description.trim().replace(/\s+/g, ' ').slice(0, 220);
+  const parts = [
+    `Complaint type: ${caseType || 'General'}.`,
+    location ? `Location: ${location}.` : '',
+    incidentDate ? `Date: ${incidentDate}.` : '',
+    incidentTime ? `Time: ${incidentTime}.` : '',
+    accusedName ? `Accused: ${accusedName}.` : '',
+    shortDescription ? `Summary: ${shortDescription}${description.length > 220 ? '...' : ''}` : '',
+  ].filter(Boolean);
+  return parts.join(' ');
+};
+
+const generateCaseAnalysis = ({ description = '', evidence = '', proofCount = 0, witnessDetails = '' }) => {
+  const detailScore = clamp(Math.floor(description.trim().length / 10), 0, 45);
+  const evidenceScore = evidence.trim() ? clamp(Math.floor(evidence.trim().length / 20), 0, 20) : 0;
+  const witnessScore = witnessDetails.trim() ? 15 : 0;
+  const proofScore = clamp((Number(proofCount) || 0) * 5, 0, 20);
+  const completenessScore = clamp(detailScore + evidenceScore + witnessScore + proofScore, 5, 100);
+
+  let riskLevel = 'High';
+  if (completenessScore >= 70) riskLevel = 'Low';
+  else if (completenessScore >= 40) riskLevel = 'Medium';
+
+  const likelyOutcome =
+    completenessScore >= 70
+      ? 'Strong filing quality. Good chance of quick FIR and investigation progress.'
+      : completenessScore >= 40
+      ? 'Moderate filing quality. Add more evidence/witness details for stronger progression.'
+      : 'Low filing quality. More concrete details and proof are recommended before escalation.';
+
+  return {
+    completenessScore,
+    riskLevel,
+    likelyOutcome,
+    recommendations: [
+      'Keep original evidence safe and untouched.',
+      'Add timeline with exact dates/time if possible.',
+      'Attach witness names/contact details.',
+      'Record every police update for follow-up.',
+    ],
+  };
+};
+
+const generateEscalationDraft = ({
+  name = '',
+  phone = '',
+  email = '',
+  trackingId = '',
+  caseType = '',
+  location = '',
+  summary = '',
+}) => {
+  return [
+    'Subject: Request for Case Escalation and Priority Review',
+    '',
+    'To,',
+    'The Concerned Senior Officer,',
+    '',
+    `I, ${name || '[Your Name]'}, request escalation of my complaint for priority review.`,
+    `Tracking ID: ${trackingId || '[Tracking ID]'}`,
+    `Case Type: ${caseType || '[Case Type]'}`,
+    location ? `Incident Location: ${location}` : '',
+    '',
+    `Complaint Summary: ${summary || '[Summary]'}`,
+    '',
+    'Reason for escalation:',
+    '- Matter is serious and requires timely action.',
+    '- I request status update, FIR/investigation progress, and next procedural steps.',
+    '',
+    `Contact: ${phone || '[Phone]'} | ${email || '[Email]'}`,
+    '',
+    'Kindly acknowledge and take necessary action at the earliest.',
+    '',
+    'Regards,',
+    `${name || '[Your Name]'}`,
+  ]
+    .filter(Boolean)
+    .join('\n');
 };
 
 const buildCaseNumber = () => {
@@ -23,6 +124,28 @@ const buildTrackingId = () => {
   const year = new Date().getFullYear();
   const random = Math.random().toString(36).slice(2, 8).toUpperCase();
   return `TRK-${year}-${random}`;
+};
+
+const buildProtectedId = () => {
+  const year = new Date().getFullYear();
+  const random = Math.random().toString(36).slice(2, 10).toUpperCase();
+  return `PID-${year}-${random}`;
+};
+
+const getNearestPoliceStation = (pincode) => {
+  if (!pincode) return 'Nearest police station to be assigned';
+  return PINCODE_STATION_MAP[pincode] || 'Nearest police station to be assigned';
+};
+
+const sanitizeProtectedCaseForPolice = (caseData) => {
+  if (!caseData?.is_protected_case) return caseData;
+  return {
+    ...caseData,
+    complainant_name: 'Protected Identity',
+    complainant_email: null,
+    complainant_phone: null,
+    complaint_form_json: null,
+  };
 };
 
 const canAccessCase = (caseData, user) => {
@@ -63,6 +186,20 @@ const logCaseActivity = async (caseId, userId, activityType, description) => {
   }
 };
 
+// Public: nearest police station by pincode
+router.get('/public/police-station/:pincode', async (req, res) => {
+  try {
+    const { pincode } = req.params;
+    if (!/^\d{6}$/.test(pincode)) {
+      return res.status(400).json({ error: 'Invalid pincode' });
+    }
+    const station = getNearestPoliceStation(pincode);
+    res.json({ pincode, nearestPoliceStation: station });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Public: track complaint by tracking ID
 router.get('/public/track/:trackingId', async (req, res) => {
   try {
@@ -97,6 +234,13 @@ router.get('/public/track/:trackingId', async (req, res) => {
         firNumber: caseData.fir_number || null,
         firRegisteredAt: caseData.fir_registered_at || null,
         caseStrength: caseData.case_strength || 0,
+        complaintSummary: caseData.complaint_summary || null,
+        caseAnalysis: caseData.case_analysis || null,
+        escalationDraft: caseData.escalation_draft || null,
+        isProtectedCase: !!caseData.is_protected_case,
+        protectedId: caseData.protected_reference_id || null,
+        pincode: caseData.complainant_pincode || null,
+        nearestPoliceStation: caseData.nearest_police_station || null,
         createdAt: caseData.created_at,
         updatedAt: caseData.updated_at,
       },
@@ -119,15 +263,67 @@ router.post('/public/complaints', async (req, res) => {
       description,
       evidence = '',
       proofCount = 0,
+      incidentDate = null,
+      incidentTime = null,
+      accusedName = null,
+      witnessDetails = null,
+      urgencyLevel = null,
+      preferredLanguage = null,
+      pincode = null,
+      isProtectedCase = false,
     } = req.body;
 
-    if (!name || !email || !phone || !location || !caseType || !description) {
+    if (!name || !email || !phone || !location || !caseType || !description || !pincode) {
       return res.status(400).json({ error: 'Missing required complaint fields' });
+    }
+    if (!/^\d{6}$/.test(String(pincode))) {
+      return res.status(400).json({ error: 'Pincode must be 6 digits' });
     }
 
     const caseNumber = buildCaseNumber();
     const trackingId = buildTrackingId();
+    const protectedReferenceId = isProtectedCase ? buildProtectedId() : null;
+    const nearestPoliceStation = getNearestPoliceStation(String(pincode));
     const caseStrength = calculateCaseStrength({ description, evidence, proofCount: Number(proofCount) || 0 });
+    const complaintSummary = buildComplaintSummary({
+      caseType,
+      description,
+      location,
+      incidentDate,
+      incidentTime,
+      accusedName,
+    });
+    const caseAnalysis = generateCaseAnalysis({ description, evidence, proofCount, witnessDetails });
+    const escalationDraft = generateEscalationDraft({
+      name,
+      phone,
+      email,
+      trackingId,
+      caseType,
+      location,
+      summary: complaintSummary,
+    });
+    const complaintFormSnapshot = {
+      name,
+      email,
+      phone,
+      location,
+      caseType,
+      description,
+      evidence,
+      proofCount: Number(proofCount) || 0,
+      incidentDate,
+      incidentTime,
+      accusedName,
+      witnessDetails,
+      urgencyLevel,
+      preferredLanguage,
+      pincode,
+      isProtectedCase,
+      protectedReferenceId,
+      nearestPoliceStation,
+      submittedAt: new Date().toISOString(),
+    };
 
     const { data, error } = await supabase
       .from('cases')
@@ -145,11 +341,25 @@ router.post('/public/complaints', async (req, res) => {
         complainant_email: email,
         complainant_phone: phone,
         complainant_location: location,
+        complainant_pincode: String(pincode),
+        nearest_police_station: nearestPoliceStation,
         evidence_text: evidence || null,
         proof_count: Number(proofCount) || 0,
         case_strength: caseStrength,
+        complaint_summary: complaintSummary,
+        complaint_form_json: complaintFormSnapshot,
+        case_analysis: caseAnalysis,
+        escalation_draft: escalationDraft,
+        incident_date: incidentDate,
+        incident_time: incidentTime,
+        accused_name: accusedName,
+        witness_details: witnessDetails,
+        urgency_level: urgencyLevel,
+        preferred_language: preferredLanguage,
+        is_protected_case: Boolean(isProtectedCase),
+        protected_reference_id: protectedReferenceId,
         progress_percent: 10,
-        progress_notes: 'Complaint submitted successfully. Waiting for police review.',
+        progress_notes: `Complaint submitted successfully. Waiting for police review at ${nearestPoliceStation}.`,
       })
       .select()
       .single();
@@ -165,6 +375,12 @@ router.post('/public/complaints', async (req, res) => {
         caseNumber,
         trackingId,
         caseStrength,
+        complaintSummary,
+        caseAnalysis,
+        escalationDraft,
+        fullFormSaved: true,
+        protectedId: protectedReferenceId,
+        nearestPoliceStation,
         status: data.status,
       },
     });
@@ -190,7 +406,11 @@ router.get('/police/inbox', authenticateToken, requireRoles('admin', 'police'), 
     const { data, error } = await query;
     if (error) throw error;
 
-    res.json({ cases: data || [] });
+    const sanitized = (data || []).map((caseItem) =>
+      req.user.userType === 'police' ? sanitizeProtectedCaseForPolice(caseItem) : caseItem
+    );
+
+    res.json({ cases: sanitized });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -249,7 +469,8 @@ router.put('/:id/fir', authenticateToken, requireRoles('admin', 'police'), async
       `FIR/Progress updated${firNumber ? ` (FIR: ${firNumber})` : ''}; progress ${nextProgress}%`
     );
 
-    res.json({ message: 'FIR/progress updated', case: data });
+    const responseCase = req.user.userType === 'police' ? sanitizeProtectedCaseForPolice(data) : data;
+    res.json({ message: 'FIR/progress updated', case: responseCase });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -343,7 +564,8 @@ router.get('/:id', authenticateToken, requireRoles('admin', 'police', 'lawyer'),
     if (!caseData) return res.status(404).json({ error: 'Case not found' });
     if (!canAccessCase(caseData, req.user)) return res.status(403).json({ error: 'Unauthorized' });
 
-    res.json({ case: caseData });
+    const responseCase = req.user.userType === 'police' ? sanitizeProtectedCaseForPolice(caseData) : caseData;
+    res.json({ case: responseCase });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
