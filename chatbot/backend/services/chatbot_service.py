@@ -5,7 +5,10 @@ Handles complaint categorization, legal guidance, and optional GPT chat
 
 import os
 from openai import OpenAI
-from groq import Groq
+try:
+    from groq import Groq
+except ImportError:
+    Groq = None
 
 class ChatbotService:
     """Main chatbot service for processing legal complaints and chat"""
@@ -142,7 +145,7 @@ class ChatbotService:
         """
         # Try Groq first (free option)
         groq_key = os.getenv("GROQ_API_KEY")
-        if groq_key:
+        if groq_key and Groq is not None:
             try:
                 client = Groq(api_key=groq_key)
                 # Use currently supported Groq model (llama-3.3-70b-versatile)
